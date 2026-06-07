@@ -1,0 +1,91 @@
+/* Notifications */
+#notifications {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  z-index: 9999;
+  pointer-events: none;
+  max-width: 340px;
+}
+
+.notification {
+  pointer-events: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.5), 0 2px 6px rgba(0,0,0,0.35);
+  transform-origin: right top;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(6px);
+  animation: notif-in 320ms cubic-bezier(.2,.9,.25,1);
+}
+
+.notification--primary {
+  background: linear-gradient(135deg, #063a8d 0%, #071024 60%, #000000 100%);
+}
+.notification--success {
+  background: linear-gradient(135deg, #0ea5e9 0%, #031124 60%, #001214 100%);
+}
+.notification--error {
+  background: linear-gradient(135deg, #ef4444 0%, #2b0a0a 60%, #000000 100%);
+}
+.notification--info {
+  background: linear-gradient(135deg, #60a5fa 0%, #031e3b 60%, #000814 100%);
+}
+
+.notification .notif-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:8px;
+  background: rgba(255,255,255,0.06);
+  font-size:18px;
+}
+
+.notification .notif-body {
+  flex:1;
+  font-size: 14px;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.notification .notif-close {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.9);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 6px;
+  margin-left: 6px;
+}
+
+@keyframes notif-in {
+  from { opacity: 0; transform: translateX(16px) scale(.98); }
+  to   { opacity: 1; transform: translateX(0)     scale(1); }
+}
+@keyframes notif-out {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to   { opacity: 0; transform: translateX(16px) scale(.98); }
+}
+
+.visually-hidden { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+/* Confirm dialog specific */
+.notification--confirm { padding: 12px; display:flex; flex-direction: column; gap:10px; }
+.confirm-actions { display:flex; gap:8px; justify-content:flex-end; }
+.confirm-actions .notif-yes, .confirm-actions .notif-no {
+  padding: 8px 12px; border-radius:8px; border: none; cursor: pointer; font-weight:600;
+}
+.confirm-actions .notif-yes { background: rgba(255,255,255,0.12); color: #fff; }
+.confirm-actions .notif-no { background: rgba(0,0,0,0.3); color: #fff; }
+

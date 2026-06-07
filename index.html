@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DUROH</title>
+  <link rel="stylesheet" href="index.css">
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link rel="stylesheet" href="notifications.css">
+</head>
+<body>
+  <div id="notifications" aria-live="polite" aria-atomic="true"></div>
+  <canvas id="bgCanvas" aria-hidden="true"></canvas>
+
+  <header class="navbar">
+    <div class="logo">DUROH</div>
+
+    <!-- Logged-in nav -->
+    <nav id="authNav" style="display:none">
+      <ul class="nav-items">
+        <li class="nav-item"><button class="nav-link active" id="homeBtn"><span class="material-symbols-outlined">home</span> Home</button></li>
+        <li class="nav-item"><button class="nav-link" id="inboxBtn"><span class="material-symbols-outlined">inbox</span> Inbox</button></li>
+        <li class="nav-item"><button class="nav-link" id="uploadBtn"><span class="material-symbols-outlined">upload</span> Upload</button></li>
+        <li class="nav-item"><button class="nav-link" id="profileBtn"><span class="material-symbols-outlined">person</span> Profile</button></li>
+      </ul>
+    </nav>
+
+    <!-- Guest nav -->
+    <nav id="guestNav" style="display:none">
+      <ul class="nav-items">
+        <li class="nav-item"><button class="nav-link nav-guest-btn" id="loginNavBtn"><span class="material-symbols-outlined">login</span> Log in</button></li>
+        <li class="nav-item"><button class="nav-link nav-signup-btn" id="signupNavBtn"><span class="material-symbols-outlined">person_add</span> Sign up</button></li>
+      </ul>
+    </nav>
+
+    <button class="menu-toggle" id="menuToggle"><span class="material-symbols-outlined">menu</span></button>
+    <nav class="mobile-nav" id="mobileNav" aria-hidden="true">
+      <ul id="mobileNavList"></ul>
+    </nav>
+
+    <!-- Profile pic button — only shown when logged in -->
+    <button class="profile-pic-btn" id="profilePicBtn" style="display:none" title="Go to Profile" aria-label="Profile">
+      <img id="profile-pic-img" src="dre.jpg" alt="Profile">
+    </button>
+  </header>
+
+  <main>
+
+    <div class="stage" id="stage">
+      <div class="stage-glow" aria-hidden="true"></div>
+      <div class="reel" id="reel"></div>
+      <div class="corner tl" aria-hidden="true"></div>
+      <div class="corner tr" aria-hidden="true"></div>
+      <div class="corner bl" aria-hidden="true"></div>
+      <div class="corner br" aria-hidden="true"></div>
+
+      <div class="in-stage-actions" id="inStageActions">
+        <div class="action-item">
+          <button class="action-btn like-btn" id="likeBtn" title="Like">
+            <span class="material-symbols-outlined" id="likeIcon">favorite</span>
+          </button>
+          <span class="action-count" id="likeCount">0</span>
+        </div>
+        <div class="action-item">
+          <button class="action-btn comment-btn" id="commentBtn" title="Comment">
+            <span class="material-symbols-outlined">chat_bubble</span>
+          </button>
+          <span class="action-count" id="commentCount">0</span>
+        </div>
+        <div class="action-item">
+          <button class="action-btn repost-btn" id="repostBtn" title="Repost">
+            <span class="material-symbols-outlined" id="repostIcon">repeat</span>
+          </button>
+          <span class="action-count" id="repostCount">0</span>
+        </div>
+        <div class="action-item">
+          <button class="action-btn mute-btn" id="muteBtn" title="Toggle sound">
+            <span class="material-symbols-outlined" id="muteIcon">volume_up</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="in-stage-caption" id="inStageCaption"></div>
+
+      <div class="video-progress" id="videoProgress" aria-hidden="true">
+        <div class="video-progress-fill" id="videoProgressFill"></div>
+      </div>
+
+      <button class="nav-arrow nav-up" id="navUp" aria-label="Previous video">
+        <span class="material-symbols-outlined">expand_less</span>
+      </button>
+      <button class="nav-arrow nav-down" id="navDown" aria-label="Next video">
+        <span class="material-symbols-outlined">expand_more</span>
+      </button>
+    </div>
+  </main>
+
+  <div class="comments-backdrop" id="commentsBackdrop"></div>
+  <div class="comments-panel" id="commentsPanel" aria-hidden="true">
+    <div class="comments-drag-handle"></div>
+    <div class="comments-header">
+      <h3>Comments</h3>
+      <button class="close-comments-btn" id="closeComments"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="comments-list" id="commentsList"><p class="comments-empty">No comments yet. Be the first!</p></div>
+    <div class="comment-input-row">
+      <input type="text" id="commentInput" placeholder="Add a comment…" maxlength="300" autocomplete="off" />
+      <button class="post-comment-btn" id="submitComment">Post</button>
+    </div>
+  </div>
+
+<script type="module">
+import { client, account, databases, getCurrentUser, Query, ID, DB_ID, COL_VIDEOS, COL_LIKES, COL_COMMENTS, COL_REPOSTS } from './appwrite.js';
+import { showNotification } from './notifications.js';
+
+// ── Auth state: show right nav, profile pic ──────────────────────
+const authNav       = document.getElementById('authNav');
+const guestNav      = document.getElementById('guestNav');
+const profilePicBtn = document.getElementById('profilePicBtn');
+const profilePicImg = document.getElementById('profile-pic-img');
+const mobileNavList = document.getElementById('mobileNavList');
+
+let currentUser = null;
+let userPrefs   = {};
+
+async function initAuth() {
+  currentUser = await getCurrentUser();
+  if (currentUser) {
+    userPrefs = await account.getPrefs().catch(() => ({}));
+    // Show logged-in nav
+    authNav.style.display = 'block';
+    guestNav.style.display = 'none';
+    profilePicBtn.style.display = 'flex';
+    // Sync profile pic
+    syncProfilePic();
+    // Mobile nav: full logged-in items
+    mobileNavList.innerHTML = `
+      <li><button class="nav-link" onclick="window.location.href='index.html'">Home</button></li>
+      <li><button class="nav-link" onclick="window.location.href='chat.html'">Inbox</button></li>
+      <li><button class="nav-link" onclick="window.location.href='upload.html'">Upload</button></li>
+      <li><button class="nav-link" onclick="window.location.href='profile.html'">Profile</button></li>`;
+  } else {
+    // Show guest nav
+    authNav.style.display = 'none';
+    guestNav.style.display = 'block';
+    profilePicBtn.style.display = 'none';
+    // Mobile nav: guest items
+    mobileNavList.innerHTML = `
+      <li><button class="nav-link" onclick="window.location.href='login.html'">Log in</button></li>
+      <li><button class="nav-link nav-signup-btn" onclick="window.location.href='signup.html'">Sign up</button></li>`;
+  }
+}
+
+function syncProfilePic() {
+  const pic = userPrefs.picUrl;
+  if (pic && profilePicImg) profilePicImg.src = pic;
+}
+
+// ── Run auth then load videos ──
+// initAuth is awaited so currentUser is set before fetchVideos runs
+await initAuth();
+
+// Re-sync when tab becomes visible or localStorage updates (profile page saves)
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible') {
+    userPrefs = await account.getPrefs().catch(() => ({}));
+    syncProfilePic();
+  }
+});
+window.addEventListener('storage', async e => {
+  if (e.key === 'profile_updated') {
+    userPrefs = await account.getPrefs().catch(() => ({}));
+    syncProfilePic();
+  }
+});
+
+// Profile pic button → profile.html
+profilePicBtn.addEventListener('click', () => window.location.href = 'profile.html');
+
+// Navbar
+document.getElementById('homeBtn').onclick    = () => {};
+document.getElementById('inboxBtn').onclick   = () => window.location.href = 'chat.html';
+document.getElementById('uploadBtn').onclick  = () => window.location.href = 'upload.html';
+document.getElementById('profileBtn').onclick = () => window.location.href = 'profile.html';
+document.getElementById('loginNavBtn').onclick  = () => window.location.href = 'login.html';
+document.getElementById('signupNavBtn').onclick = () => window.location.href = 'signup.html';
+
+// Mobile menu
+const menuToggle = document.getElementById('menuToggle');
+const mobileNav  = document.getElementById('mobileNav');
+const closeMNav  = () => { mobileNav.style.display='none'; mobileNav.setAttribute('aria-hidden','true'); };
+const openMNav   = () => { mobileNav.style.display='block'; mobileNav.setAttribute('aria-hidden','false'); };
+menuToggle.addEventListener('click', e => { e.stopPropagation(); mobileNav.style.display==='block' ? closeMNav() : openMNav(); });
+document.addEventListener('click', e => { if (!mobileNav.contains(e.target) && e.target!==menuToggle) closeMNav(); });
+document.addEventListener('keydown', e => { if (e.key==='Escape') { closeMNav(); closeComments(); } });
+
+// ── Canvas particles ──
+const canvas = document.getElementById('bgCanvas');
+const ctx    = canvas.getContext('2d');
+let particles = [];
+function resizeCanvas() { canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+function spawnP() { return {x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*1.8+.4,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,a:Math.random()*.5+.1}; }
+for(let i=0;i<90;i++) particles.push(spawnP());
+function drawP() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  particles.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`rgba(87,149,243,${p.a})`;ctx.fill();p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>canvas.width)p.vx*=-1;if(p.y<0||p.y>canvas.height)p.vy*=-1;});
+  requestAnimationFrame(drawP);
+}
+drawP();
+
+// ── State ──
+let videos=[], currentIndex=0, isMuted=false, isTransitioning=false;
+let interactions={liked:false,reposted:false,likes:0,comments:0,reposts:0};
+let likeDocId=null, repostDocId=null;
+
+const reel           = document.getElementById('reel');
+const inStageCaption = document.getElementById('inStageCaption');
+const likeBtn        = document.getElementById('likeBtn');
+const likeCountEl    = document.getElementById('likeCount');
+const commentBtn     = document.getElementById('commentBtn');
+const commentCountEl = document.getElementById('commentCount');
+const repostBtn      = document.getElementById('repostBtn');
+const repostCountEl  = document.getElementById('repostCount');
+const muteBtn        = document.getElementById('muteBtn');
+const muteIcon       = document.getElementById('muteIcon');
+const progressFill   = document.getElementById('videoProgressFill');
+
+function uid() { return currentUser?.$id||null; }
+function fmt(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return String(n);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── Fetch videos ──
+async function fetchVideos() {
+  // Guard: catch unfilled DB_ID placeholder
+  if (DB_ID === 'YOUR_DATABASE_ID') {
+    reel.innerHTML = '<p class="empty-msg">⚠️ Open appwrite.js and paste your Database ID into DB_ID.</p>';
+    return;
+  }
+  try {
+    const res = await databases.listDocuments(DB_ID,COL_VIDEOS,[Query.orderDesc('created_at'),Query.limit(100)]);
+    if(!res.documents.length){reel.innerHTML='<p class="empty-msg">No videos uploaded yet.</p>';return;}
+    videos=res.documents; renderSlide(currentIndex,'none');
+  } catch(err){reel.innerHTML='<p class="empty-msg">Failed to load videos.</p>';console.error(err);}
+}
+
+function renderSlide(index,direction='down') {
+  if(!videos.length) return;
+  const doc=videos[index];
+  inStageCaption.textContent  = doc.caption||'';
+
+  const oldSlide=reel.querySelector('.slide');
+  if(oldSlide){oldSlide.classList.add(direction==='up'?'exit-down':'exit-up');setTimeout(()=>oldSlide.remove(),420);}
+
+  const slide=document.createElement('div');
+  slide.className='slide '+(direction==='up'?'enter-up':direction==='none'?'enter-none':'enter-down');
+  const videoEl=document.createElement('video');
+  videoEl.src=doc.url; videoEl.autoplay=true; videoEl.loop=true; videoEl.playsInline=true; videoEl.muted=isMuted; videoEl.volume=1.0;
+  videoEl.addEventListener('timeupdate',()=>{if(videoEl.duration) progressFill.style.width=(videoEl.currentTime/videoEl.duration*100)+'%';});
+  videoEl.addEventListener('click',()=>{videoEl.paused?videoEl.play():videoEl.pause();});
+  slide.appendChild(videoEl);
+  reel.appendChild(slide);
+
+  videoEl.play().then(()=>{if(!isMuted){videoEl.muted=false;videoEl.volume=1.0;}}).catch(()=>{
+    videoEl.muted=true;
+    videoEl.play().then(()=>{if(!isMuted) setTimeout(()=>{videoEl.muted=false;videoEl.volume=1.0;},300);});
+  });
+
+  loadInteractions(doc.$id);
+  loadComments(doc.$id);
+}
+
+function navigate(dir) {
+  if(!videos.length||isTransitioning) return;
+  isTransitioning=true; closeComments();
+  currentIndex=dir==='up'?(currentIndex-1+videos.length)%videos.length:(currentIndex+1)%videos.length;
+  renderSlide(currentIndex,dir);
+  setTimeout(()=>{isTransitioning=false;},450);
+}
+document.getElementById('navUp').addEventListener('click',()=>navigate('up'));
+document.getElementById('navDown').addEventListener('click',()=>navigate('down'));
+
+let wheelAccum=0;
+window.addEventListener('wheel',e=>{e.preventDefault();wheelAccum+=e.deltaY;if(wheelAccum>80){navigate('down');wheelAccum=0;}if(wheelAccum<-80){navigate('up');wheelAccum=0;}},{passive:false});
+let touchStartY=0;
+window.addEventListener('touchstart',e=>{touchStartY=e.touches[0].clientY;},{passive:true});
+window.addEventListener('touchend',e=>{const dy=touchStartY-e.changedTouches[0].clientY;if(Math.abs(dy)>55) navigate(dy>0?'down':'up');});
+window.addEventListener('keydown',e=>{if(e.key==='ArrowDown') navigate('down');if(e.key==='ArrowUp') navigate('up');});
+
+muteBtn.addEventListener('click',()=>{
+  isMuted=!isMuted; muteIcon.textContent=isMuted?'volume_off':'volume_up'; muteBtn.classList.toggle('muted',isMuted);
+  const vid=reel.querySelector('video'); if(vid){vid.muted=isMuted;if(!isMuted) vid.volume=1.0;}
+});
+
+// ── Interactions ──
+async function loadInteractions(videoId) {
+  likeCountEl.textContent='0';commentCountEl.textContent='0';repostCountEl.textContent='0';
+  likeBtn.classList.remove('liked');repostBtn.classList.remove('reposted');
+  likeDocId=repostDocId=null;
+  interactions={liked:false,reposted:false,likes:0,comments:0,reposts:0};
+  try {
+    const q=[Query.equal('video_id',videoId),Query.limit(1000)];
+    const[lk,cm,rp]=await Promise.all([
+      databases.listDocuments(DB_ID,COL_LIKES,q),
+      databases.listDocuments(DB_ID,COL_COMMENTS,q),
+      databases.listDocuments(DB_ID,COL_REPOSTS,q),
+    ]);
+    interactions.likes=lk.total;interactions.comments=cm.total;interactions.reposts=rp.total;
+    if(uid()){
+      const myLike=lk.documents.find(d=>d.user_id===uid());
+      const myRepost=rp.documents.find(d=>d.user_id===uid());
+      interactions.liked=!!myLike;interactions.reposted=!!myRepost;
+      likeDocId=myLike?.$id||null;repostDocId=myRepost?.$id||null;
+    }
+    likeCountEl.textContent=fmt(interactions.likes);
+    commentCountEl.textContent=fmt(interactions.comments);
+    repostCountEl.textContent=fmt(interactions.reposts);
+    likeBtn.classList.toggle('liked',interactions.liked);
+    repostBtn.classList.toggle('reposted',interactions.reposted);
+  }catch(e){console.warn(e);}
+}
+
+likeBtn.addEventListener('click',async()=>{
+  const videoId=videos[currentIndex]?.$id; if(!videoId) return;
+  if(!uid()){showNotification('Log in to like videos','info');return;}
+  const was=interactions.liked; interactions.liked=!was; interactions.likes+=was?-1:1;
+  likeCountEl.textContent=fmt(interactions.likes); likeBtn.classList.toggle('liked',interactions.liked); animate(likeBtn,'pop');
+  try{
+    if(was&&likeDocId){await databases.deleteDocument(DB_ID,COL_LIKES,likeDocId);likeDocId=null;}
+    else if(!was){const d=await databases.createDocument(DB_ID,COL_LIKES,ID.unique(),{video_id:videoId,user_id:uid()});likeDocId=d.$id;}
+  }catch{interactions.liked=was;interactions.likes+=was?1:-1;likeCountEl.textContent=fmt(interactions.likes);likeBtn.classList.toggle('liked',was);}
+});
+
+repostBtn.addEventListener('click',async()=>{
+  const videoId=videos[currentIndex]?.$id; if(!videoId) return;
+  if(!uid()){showNotification('Log in to repost','info');return;}
+  const was=interactions.reposted; interactions.reposted=!was; interactions.reposts+=was?-1:1;
+  repostCountEl.textContent=fmt(interactions.reposts); repostBtn.classList.toggle('reposted',interactions.reposted); animate(repostBtn,'spin');
+  if(!was) showNotification('Reposted!','success',{duration:1400});
+  try{
+    if(was&&repostDocId){await databases.deleteDocument(DB_ID,COL_REPOSTS,repostDocId);repostDocId=null;}
+    else if(!was){const d=await databases.createDocument(DB_ID,COL_REPOSTS,ID.unique(),{video_id:videoId,user_id:uid()});repostDocId=d.$id;}
+  }catch{interactions.reposted=was;interactions.reposts+=was?1:-1;repostCountEl.textContent=fmt(interactions.reposts);repostBtn.classList.toggle('reposted',was);}
+});
+
+function animate(el,cls){el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls);el.addEventListener('animationend',()=>el.classList.remove(cls),{once:true});}
+
+// ── Comments ──
+const commentsPanel=document.getElementById('commentsPanel');
+const commentsBackdrop=document.getElementById('commentsBackdrop');
+const commentsList=document.getElementById('commentsList');
+const commentInput=document.getElementById('commentInput');
+const submitComment=document.getElementById('submitComment');
+
+function openComments(){commentsPanel.classList.add('open');commentsPanel.setAttribute('aria-hidden','false');commentsBackdrop.classList.add('open');}
+function closeComments(){commentsPanel.classList.remove('open');commentsPanel.setAttribute('aria-hidden','true');commentsBackdrop.classList.remove('open');}
+commentBtn.addEventListener('click',openComments);
+document.getElementById('closeComments').addEventListener('click',closeComments);
+commentsBackdrop.addEventListener('click',closeComments);
+
+async function loadComments(videoId){
+  commentsList.innerHTML='<p class="comments-loading">Loading…</p>';
+  try{
+    const res=await databases.listDocuments(DB_ID,COL_COMMENTS,[Query.equal('video_id',videoId),Query.orderAsc('created_at'),Query.limit(200)]);
+    if(!res.documents.length){commentsList.innerHTML='<p class="comments-empty">No comments yet. Be the first!</p>';return;}
+    commentsList.innerHTML='';
+    res.documents.forEach(c=>{
+      const item=document.createElement('div'); item.className='comment-item';
+      item.innerHTML=`<div class="comment-avatar">${esc(c.username||'A')[0].toUpperCase()}</div><div class="comment-content"><span class="comment-username">${esc(c.username||'Anonymous')}</span><p class="comment-text">${esc(c.content)}</p></div>`;
+      commentsList.appendChild(item);
+    });
+    commentsList.scrollTop=commentsList.scrollHeight;
+  }catch{commentsList.innerHTML='<p class="comments-empty">Could not load comments.</p>';}
+}
+
+submitComment.addEventListener('click',async()=>{
+  const videoId=videos[currentIndex]?.$id; if(!videoId) return;
+  const content=commentInput.value.trim(); if(!content) return;
+  if(!uid()){showNotification('Log in to comment','info');return;}
+  const username=userPrefs.firstName||currentUser?.name?.split(' ')[0]||'Anonymous';
+  submitComment.disabled=true;
+  try{
+    await databases.createDocument(DB_ID,COL_COMMENTS,ID.unique(),{video_id:videoId,user_id:uid(),content,username,created_at:new Date().toISOString()});
+    commentInput.value=''; interactions.comments+=1; commentCountEl.textContent=fmt(interactions.comments);
+    loadComments(videoId);
+  }catch{showNotification('Failed to post','error');}
+  finally{submitComment.disabled=false;}
+});
+commentInput.addEventListener('keydown',e=>{if(e.key==='Enter') submitComment.click();});
+
+fetchVideos();
+</script>
+</body>
+</html>

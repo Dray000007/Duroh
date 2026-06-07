@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up – DUROH</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="signup.css">
+  <link rel="stylesheet" href="notifications.css">
+</head>
+<body>
+  <div id="notifications" aria-live="polite" aria-atomic="true"></div>
+  <div class="login-container">
+    <div class="logo">DUROH</div>
+    <div class="background-animation" id="background-animation"></div>
+    <div class="login-card">
+      <div class="header-content"><h2>Create Account</h2><p>Sign up to get started</p></div>
+      <form id="signup-form" class="login-form">
+        <div class="form-group"><label>First Name</label><div class="input-wrapper"><input id="first-name" type="text" required placeholder="Enter your first name"/></div></div>
+        <div class="form-group"><label>Last Name</label><div class="input-wrapper"><input id="last-name" type="text" required placeholder="Enter your last name"/></div></div>
+        <div class="form-group"><label>Email</label><div class="input-wrapper"><input id="email" type="email" required placeholder="Enter your email"/></div></div>
+        <div class="form-group"><label>Password</label><div class="input-wrapper"><input id="password" type="password" required placeholder="Create a password"/><span class="toggle-password" onclick="togglePwd('password',this)">👁</span></div></div>
+        <div class="form-group"><label>Confirm Password</label><div class="input-wrapper"><input id="confirm-password" type="password" required placeholder="Confirm your password"/><span class="toggle-password" onclick="togglePwd('confirm-password',this)">👁</span></div></div>
+        <button type="submit" id="signup-button" class="login-button">
+          <span class="button-text">Sign up</span>
+          <span class="spinner hidden"></span>
+        </button>
+        <button type="button" id="google-signup-button" class="google-signup-button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="margin-right:10px"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Sign up with Google
+        </button>
+      </form>
+      <div class="signup-prompt"><button id="yww">Already have an account? Log in</button></div>
+      <div class="footer-text">© 2025 DUROH. All rights reserved.</div>
+    </div>
+  </div>
+  <script type="module">
+    import { account, ID } from './appwrite.js';
+    import { showNotification } from './notifications.js';
+    window.togglePwd = (id, icon) => { const el=document.getElementById(id); el.type=el.type==="password"?"text":"password"; icon.textContent=el.type==="password"?"👁":"🙈"; };
+    document.addEventListener("DOMContentLoaded", () => {
+      const bg=document.getElementById('background-animation');
+      for(let i=0;i<20;i++){const b=document.createElement('div');b.className='bubble';const s=Math.random()*100+50;b.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;top:${Math.random()*100}%;animation-duration:${Math.random()*10+10}s;animation-delay:${Math.random()*5}s`;bg.appendChild(b);}
+      const form=document.getElementById("signup-form");
+      const btn=document.getElementById("signup-button");
+      const bText=btn.querySelector(".button-text");
+      const spin=btn.querySelector(".spinner");
+      form.addEventListener("submit", async(e)=>{
+        e.preventDefault();
+        const firstName=document.getElementById("first-name").value.trim();
+        const lastName=document.getElementById("last-name").value.trim();
+        const email=document.getElementById("email").value.trim();
+        const password=document.getElementById("password").value;
+        const confirm=document.getElementById("confirm-password").value;
+        if(password!==confirm){showNotification("Passwords do not match!","error");return;}
+        if(password.length<8){showNotification("Password must be at least 8 characters.","error");return;}
+        bText.classList.add("hidden");spin.classList.remove("hidden");btn.disabled=true;
+        try{
+          await account.create(ID.unique(),email,password,`${firstName} ${lastName}`);
+          await account.createEmailPasswordSession(email,password);
+          await account.updatePrefs({firstName,lastName,bio:'',picUrl:''});
+          showNotification("Account created! Welcome to DUROH.","success");
+          window.location.href="index.html";
+        }catch(err){showNotification(err.message||"Signup failed.","error");}
+        finally{bText.classList.remove("hidden");spin.classList.add("hidden");btn.disabled=false;}
+      });
+      document.getElementById("google-signup-button").addEventListener("click",()=>{
+        account.createOAuth2Session('google',window.location.origin+'/index.html',window.location.origin+'/signup.html');
+      });
+      document.getElementById("yww").addEventListener("click",()=>window.location.href="index.html");
+    });
+  </script>
+</body>
+</html>

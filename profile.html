@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="profile.css">
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link rel="stylesheet" href="notifications.css">
+</head>
+<body>
+  <div id="notifications" aria-live="polite" aria-atomic="true"></div>
+
+  <header class="navbar">
+    <div class="logo">DUROH</div>
+    <nav>
+      <ul class="nav-items">
+        <li class="nav-item"><button class="nav-link" id="homeBtn"><span class="material-symbols-outlined">home</span> Home</button></li>
+        <li class="nav-item"><button class="nav-link" id="inboxBtn"><span class="material-symbols-outlined">inbox</span> Inbox</button></li>
+        <li class="nav-item"><button class="nav-link" id="uploadBtn"><span class="material-symbols-outlined">upload</span> Upload</button></li>
+        <li class="nav-item"><button class="nav-link active" id="profileBtn"><span class="material-symbols-outlined">person</span> Profile</button></li>
+      </ul>
+    </nav>
+    <button class="menu-toggle" id="menuToggle"><span class="material-symbols-outlined">menu</span></button>
+    <nav class="mobile-nav" id="mobileNav" aria-hidden="true">
+      <ul>
+        <li><button class="nav-link" onclick="window.location.href='index.html'">Home</button></li>
+        <li><button class="nav-link" onclick="window.location.href='inbox.html'">Chat</button></li>
+        <li><button class="nav-link" onclick="window.location.href='upload.html'">Upload</button></li>
+        <li><button class="nav-link" onclick="window.location.href='profile.html'">Profile</button></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="profile-container">
+    <div class="profile-header">
+      <div id="profile-pic"><img id="profile-pic-img" src="" alt="Profile Picture"></div>
+    </div>
+    <div class="profile-info">
+      <h2 id="username"></h2>
+      <p id="bio"></p>
+      <div class="profile-actions">
+        <button id="editBtn">Edit Profile</button>
+        <button id="logoutBtn">Log out</button>
+      </div>
+    </div>
+
+    <div class="edit-form" id="editForm" style="display:none;">
+      <input type="text" id="editUsername" placeholder="Username" />
+      <input type="text" id="editBio" placeholder="Bio" />
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button id="choosePicBtn" type="button">Choose a new picture</button>
+        <button id="removePicBtn" type="button">Remove Picture</button>
+      </div>
+      <input type="file" id="profilePicInput" accept="image/*" style="display:none;">
+      <button id="saveBtn">Save</button>
+    </div>
+
+    <div class="video-section">
+      <h3 class="videos-heading">Your Videos</h3>
+      <div class="video-grid"></div>
+    </div>
+  </div>
+
+  <!-- Comments modal for profile page -->
+  <div class="modal-backdrop" id="modalBackdrop"></div>
+  <div class="comments-modal" id="commentsModal" aria-hidden="true" role="dialog">
+    <div class="comments-modal-header">
+      <h3>Comments</h3>
+      <button class="modal-close-btn" id="modalCloseBtn" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-comments-list" id="modalCommentsList">
+      <p class="comments-empty">No comments yet.</p>
+    </div>
+    <div class="modal-comment-input">
+      <input type="text" id="modalCommentInput" placeholder="Add a comment…" maxlength="300" autocomplete="off" />
+      <button class="modal-post-btn" id="modalPostBtn">Post</button>
+    </div>
+  </div>
+
+<script type="module">
+import { account, databases, getCurrentUser, Query, ID, DB_ID, COL_VIDEOS, COL_LIKES, COL_COMMENTS, COL_REPOSTS } from './appwrite.js';
+import { showNotification, showConfirm } from './notifications.js';
+
+const CLOUD_NAME    = "djjlt3ghq";
+const UPLOAD_PRESET = "saveImages";
+
+const DEFAULT_PIC = "data:image/png;base64,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";
+
+// ── DOM refs ──
+const profilePicImg   = document.getElementById("profile-pic-img");
+const editBtn         = document.getElementById("editBtn");
+const editForm        = document.getElementById("editForm");
+const choosePicBtn    = document.getElementById("choosePicBtn");
+const removePicBtn    = document.getElementById("removePicBtn");
+const profilePicInput = document.getElementById("profilePicInput");
+const saveBtn         = document.getElementById("saveBtn");
+const usernameEl      = document.getElementById("username");
+const bioEl           = document.getElementById("bio");
+const editUsername    = document.getElementById("editUsername");
+const editBio         = document.getElementById("editBio");
+const logoutBtn       = document.getElementById("logoutBtn");
+const videoGrid       = document.querySelector(".video-grid");
+const modalBackdrop     = document.getElementById('modalBackdrop');
+const commentsModal     = document.getElementById('commentsModal');
+const modalCloseBtn     = document.getElementById('modalCloseBtn');
+const modalCommentsList = document.getElementById('modalCommentsList');
+const modalCommentInput = document.getElementById('modalCommentInput');
+const modalPostBtn      = document.getElementById('modalPostBtn');
+
+let selectedFile       = null;
+let currentUser        = null;
+let currentPrefs       = {};
+let activeModalVideo   = null;
+
+function uid() { return currentUser?.$id || null; }
+function fmt(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'k';
+  return String(n);
+}
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Navbar ──
+window.onload = () => {
+  document.getElementById('homeBtn').onclick    = () => window.location.href = 'index.html';
+  document.getElementById('inboxBtn').onclick   = () => window.location.href = 'inbox.html';
+  document.getElementById('uploadBtn').onclick  = () => window.location.href = 'upload.html';
+};
+
+// Prevent back after logout
+window.history.pushState(null, "", window.location.href);
+window.onpopstate = async () => {
+  const user = await getCurrentUser();
+  if (!user) window.location.replace('login.html');
+};
+
+// ── Auth check ──
+async function checkAuth() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    usernameEl.textContent = 'User';
+    bioEl.textContent      = '';
+    profilePicImg.src      = DEFAULT_PIC;
+    loadVideos();
+    return;
+  }
+
+  try {
+    currentPrefs = await account.getPrefs();
+  } catch(e) { currentPrefs = {}; }
+
+  usernameEl.textContent = currentPrefs.firstName || currentUser.name?.split(' ')[0] || 'User';
+  bioEl.textContent      = currentPrefs.bio || '';
+  profilePicImg.src      = currentPrefs.picUrl || DEFAULT_PIC;
+
+  loadVideos();
+}
+checkAuth();
+
+// ── Logout ──
+logoutBtn.addEventListener("click", async () => {
+  const ok = await showConfirm('Are you sure you want to log out?', { confirmText:'Yes', cancelText:'No' });
+  if (!ok) return;
+  try {
+    await account.deleteSession('current');
+    window.location.replace('login.html');
+  } catch(err) {
+    showNotification('Failed to log out: ' + (err.message||''), 'error');
+  }
+});
+
+// ── Edit Profile ──
+editBtn.addEventListener("click", () => {
+  editForm.style.display = editForm.style.display === 'flex' ? 'none' : 'flex';
+});
+choosePicBtn.addEventListener("click", () => profilePicInput.click());
+profilePicInput.addEventListener("change", e => {
+  selectedFile = e.target.files[0];
+  if (selectedFile) profilePicImg.src = URL.createObjectURL(selectedFile);
+});
+removePicBtn.addEventListener("click", () => { profilePicImg.src = DEFAULT_PIC; selectedFile = null; });
+
+saveBtn.addEventListener("click", async () => {
+  let uploadedUrl = currentPrefs.picUrl || DEFAULT_PIC;
+  if (selectedFile) {
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("upload_preset", UPLOAD_PRESET);
+    const res  = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method:"POST", body: formData });
+    const data = await res.json();
+    uploadedUrl = data.secure_url;
+  }
+
+  const newFirstName = editUsername.value.trim() || usernameEl.textContent;
+  const newBio       = editBio.value.trim()       || bioEl.textContent;
+
+  // Appwrite: store extra profile info in user prefs
+  await account.updatePrefs({ ...currentPrefs, firstName: newFirstName, bio: newBio, picUrl: uploadedUrl });
+  // Also update the Appwrite account name
+  await account.updateName(newFirstName).catch(() => {});
+
+  currentPrefs.firstName = newFirstName;
+  currentPrefs.bio       = newBio;
+  currentPrefs.picUrl    = uploadedUrl;
+  usernameEl.textContent = newFirstName;
+  bioEl.textContent      = newBio;
+  profilePicImg.src      = uploadedUrl;
+  editForm.style.display = 'none';
+  try { localStorage.setItem('profile_updated', String(Date.now())); } catch(e) {}
+  showNotification('Profile saved!', 'success');
+});
+
+// ── Load Videos ──
+async function loadVideos() {
+  if (!uid()) {
+    videoGrid.innerHTML = '<p class="no-videos">No videos uploaded yet.</p>';
+    return;
+  }
+
+  try {
+    const res = await databases.listDocuments(DB_ID, COL_VIDEOS, [
+      Query.equal('user_id', uid()),
+      Query.orderDesc('created_at'),
+      Query.limit(100),
+    ]);
+
+    if (!res.documents.length) {
+      videoGrid.innerHTML = '<p class="no-videos">No videos uploaded yet.</p>';
+      return;
+    }
+
+    const docs     = res.documents;
+    const videoIds = docs.map(v => v.$id);
+
+    // Batch-fetch interaction counts
+    const [lkRes, cmRes, rpRes, ulRes] = await Promise.all([
+      databases.listDocuments(DB_ID, COL_LIKES,    [Query.equal('video_id', videoIds), Query.limit(5000)]),
+      databases.listDocuments(DB_ID, COL_COMMENTS, [Query.equal('video_id', videoIds), Query.limit(5000)]),
+      databases.listDocuments(DB_ID, COL_REPOSTS,  [Query.equal('video_id', videoIds), Query.limit(5000)]),
+      databases.listDocuments(DB_ID, COL_LIKES,    [Query.equal('video_id', videoIds), Query.equal('user_id', uid()), Query.limit(5000)]),
+    ]);
+
+    const likesMap    = {};
+    const commentsMap = {};
+    const repostsMap  = {};
+    const likedSet    = new Set(ulRes.documents.map(d => d.video_id));
+    const likeDocMap  = {};
+    ulRes.documents.forEach(d => { likeDocMap[d.video_id] = d.$id; });
+
+    lkRes.documents.forEach(d => { likesMap[d.video_id]    = (likesMap[d.video_id]   ||0)+1; });
+    cmRes.documents.forEach(d => { commentsMap[d.video_id] = (commentsMap[d.video_id]||0)+1; });
+    rpRes.documents.forEach(d => { repostsMap[d.video_id]  = (repostsMap[d.video_id] ||0)+1; });
+
+    videoGrid.innerHTML = '';
+    docs.forEach(video => {
+      const box = document.createElement("div");
+      box.className = "video-box";
+      box.dataset.videoId = video.$id;
+
+      const videoEl = document.createElement("video");
+      videoEl.src = video.url;
+      videoEl.loop = true;
+      videoEl.playsInline = true;
+      videoEl.muted = false;
+      videoEl.style.filter = "brightness(0.3)";
+      box.appendChild(videoEl);
+
+      if (video.caption) {
+        const cap = document.createElement("p");
+        cap.className = "caption-overlay";
+        cap.innerText = video.caption;
+        box.appendChild(cap);
+      }
+
+      // Interaction bar
+      const interBar = document.createElement('div');
+      interBar.className = 'video-interact-bar';
+      const liked   = likedSet.has(video.$id);
+      const lCount  = likesMap[video.$id]    || 0;
+      const cCount  = commentsMap[video.$id] || 0;
+      const rCount  = repostsMap[video.$id]  || 0;
+
+      interBar.innerHTML = `
+        <button class="vi-btn vi-like ${liked?'liked':''}" data-vid="${video.$id}" data-liked="${liked}" data-ldocid="${likeDocMap[video.$id]||''}" title="Like">
+          <span class="material-symbols-outlined">favorite</span>
+          <span class="vi-count">${fmt(lCount)}</span>
+        </button>
+        <button class="vi-btn vi-comment" data-vid="${video.$id}" title="Comments">
+          <span class="material-symbols-outlined">chat_bubble</span>
+          <span class="vi-count">${fmt(cCount)}</span>
+        </button>
+        <button class="vi-btn vi-repost" data-vid="${video.$id}" title="Repost">
+          <span class="material-symbols-outlined">repeat</span>
+          <span class="vi-count">${fmt(rCount)}</span>
+        </button>`;
+      box.appendChild(interBar);
+
+      // Action bar (delete / download)
+      const actBar = document.createElement('div');
+      actBar.className = 'video-act-bar';
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "delete-btn";
+      delBtn.innerHTML = '<span class="material-symbols-outlined">delete</span>';
+      delBtn.title = "Delete";
+      delBtn.onclick = async e => {
+        e.stopPropagation();
+        const ok = await showConfirm('Delete this video?', { confirmText:'Delete', cancelText:'Cancel' });
+        if (!ok) return;
+        try {
+          await databases.deleteDocument(DB_ID, COL_VIDEOS, video.$id);
+          showNotification('Video deleted', 'success', { duration: 2000 });
+          loadVideos();
+        } catch(err) { showNotification("Failed to delete video", 'error'); }
+      };
+      actBar.appendChild(delBtn);
+
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'download-btn';
+      dlBtn.innerHTML = '<span class="material-symbols-outlined">download</span>';
+      dlBtn.title = "Download";
+      dlBtn.onclick = async e => {
+        e.stopPropagation();
+        try {
+          showNotification('Preparing download…', 'info');
+          const res  = await fetch(video.url);
+          const blob = await res.blob();
+          const url  = URL.createObjectURL(blob);
+          const a    = document.createElement('a');
+          a.href = url;
+          a.download = (video.caption?.replace(/[^a-z0-9\-_.]/gi,'_') || 'video') + '.mp4';
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        } catch(err) { showNotification('Download failed', 'error'); }
+      };
+      actBar.appendChild(dlBtn);
+      box.appendChild(actBar);
+
+      // Hover play
+      box.addEventListener("mouseenter", () => { videoEl.play(); videoEl.style.filter='brightness(1)'; });
+      box.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.style.filter='brightness(0.35)'; });
+
+      // Like
+      interBar.querySelector('.vi-like').addEventListener('click', async e => {
+        e.stopPropagation();
+        const btn     = e.currentTarget;
+        const videoId = btn.dataset.vid;
+        if (!uid()) { showNotification('Log in to like','info'); return; }
+        const wasLiked  = btn.dataset.liked === 'true';
+        const lDocId    = btn.dataset.ldocid;
+        const countEl   = btn.querySelector('.vi-count');
+        const cur       = parseInt(countEl.textContent)||0;
+
+        btn.dataset.liked = String(!wasLiked);
+        btn.classList.toggle('liked', !wasLiked);
+        countEl.textContent = fmt(cur + (wasLiked ? -1 : 1));
+        btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
+
+        try {
+          if (wasLiked && lDocId) {
+            await databases.deleteDocument(DB_ID, COL_LIKES, lDocId);
+            btn.dataset.ldocid = '';
+          } else if (!wasLiked) {
+            const doc = await databases.createDocument(DB_ID, COL_LIKES, ID.unique(), { video_id: videoId, user_id: uid() });
+            btn.dataset.ldocid = doc.$id;
+          }
+        } catch {
+          btn.dataset.liked = String(wasLiked);
+          btn.classList.toggle('liked', wasLiked);
+          countEl.textContent = fmt(cur);
+        }
+      });
+
+      // Comment
+      interBar.querySelector('.vi-comment').addEventListener('click', e => {
+        e.stopPropagation();
+        openCommentsModal(video.$id);
+      });
+
+      // Repost
+      interBar.querySelector('.vi-repost').addEventListener('click', async e => {
+        e.stopPropagation();
+        const btn     = e.currentTarget;
+        const videoId = btn.dataset.vid;
+        if (!uid()) { showNotification('Log in to repost','info'); return; }
+        const wasRep  = btn.classList.contains('reposted');
+        const countEl = btn.querySelector('.vi-count');
+        const cur     = parseInt(countEl.textContent)||0;
+
+        btn.classList.toggle('reposted', !wasRep);
+        countEl.textContent = fmt(cur + (wasRep ? -1 : 1));
+        btn.classList.remove('spin'); void btn.offsetWidth; btn.classList.add('spin');
+        if (!wasRep) showNotification('Reposted!','success',{duration:1500});
+
+        try {
+          if (wasRep) {
+            // find and delete repost doc
+            const r = await databases.listDocuments(DB_ID, COL_REPOSTS, [
+              Query.equal('video_id', videoId), Query.equal('user_id', uid()), Query.limit(1)
+            ]);
+            if (r.documents[0]) await databases.deleteDocument(DB_ID, COL_REPOSTS, r.documents[0].$id);
+          } else {
+            await databases.createDocument(DB_ID, COL_REPOSTS, ID.unique(), { video_id: videoId, user_id: uid() });
+          }
+        } catch {
+          btn.classList.toggle('reposted', wasRep);
+          countEl.textContent = fmt(cur);
+        }
+      });
+
+      videoGrid.appendChild(box);
+    });
+  } catch(err) {
+    console.error('loadVideos error:', err);
+    videoGrid.innerHTML = '<p class="no-videos">Could not load videos.</p>';
+  }
+}
+
+// ── Comments modal ──
+function openCommentsModal(videoId) {
+  activeModalVideo = videoId;
+  loadModalComments(videoId);
+  commentsModal.classList.add('open');
+  commentsModal.setAttribute('aria-hidden','false');
+  modalBackdrop.classList.add('open');
+}
+function closeCommentsModal() {
+  commentsModal.classList.remove('open');
+  commentsModal.setAttribute('aria-hidden','true');
+  modalBackdrop.classList.remove('open');
+  activeModalVideo = null;
+}
+modalCloseBtn.addEventListener('click', closeCommentsModal);
+modalBackdrop.addEventListener('click', closeCommentsModal);
+document.addEventListener('keydown', e => { if (e.key==='Escape') closeCommentsModal(); });
+
+async function loadModalComments(videoId) {
+  modalCommentsList.innerHTML = '<p class="comments-loading">Loading…</p>';
+  try {
+    const res = await databases.listDocuments(DB_ID, COL_COMMENTS, [
+      Query.equal('video_id', videoId),
+      Query.orderAsc('created_at'),
+      Query.limit(200),
+    ]);
+    if (!res.documents.length) {
+      modalCommentsList.innerHTML = '<p class="comments-empty">No comments yet. Be the first!</p>';
+      return;
+    }
+    modalCommentsList.innerHTML = '';
+    res.documents.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'comment-item';
+      item.innerHTML = `
+        <div class="comment-avatar">${esc(c.username||'A')[0].toUpperCase()}</div>
+        <div class="comment-content">
+          <span class="comment-username">${esc(c.username||'Anonymous')}</span>
+          <p class="comment-text">${esc(c.content)}</p>
+        </div>`;
+      modalCommentsList.appendChild(item);
+    });
+    modalCommentsList.scrollTop = modalCommentsList.scrollHeight;
+  } catch {
+    modalCommentsList.innerHTML = '<p class="comments-empty">Could not load comments.</p>';
+  }
+}
+
+modalPostBtn.addEventListener('click', async () => {
+  if (!activeModalVideo) return;
+  const content = modalCommentInput.value.trim();
+  if (!content) return;
+  if (!uid()) { showNotification('Log in to comment','info'); return; }
+  const username = currentPrefs.firstName || currentUser?.name?.split(' ')[0] || 'Anonymous';
+  modalPostBtn.disabled = true;
+  try {
+    await databases.createDocument(DB_ID, COL_COMMENTS, ID.unique(), {
+      video_id: activeModalVideo, user_id: uid(), content, username,
+      created_at: new Date().toISOString(),
+    });
+    modalCommentInput.value = '';
+    const countEl = document.querySelector(`.vi-comment[data-vid="${activeModalVideo}"] .vi-count`);
+    if (countEl) countEl.textContent = fmt((parseInt(countEl.textContent)||0) + 1);
+    loadModalComments(activeModalVideo);
+  } catch { showNotification('Failed to post comment','error'); }
+  finally { modalPostBtn.disabled = false; }
+});
+modalCommentInput.addEventListener('keydown', e => { if (e.key==='Enter') modalPostBtn.click(); });
+
+// ── Mobile menu ──
+const menuToggle = document.getElementById('menuToggle');
+const mobileNav  = document.getElementById('mobileNav');
+const closeMNav  = () => { mobileNav.style.display='none'; mobileNav.setAttribute('aria-hidden','true'); };
+const openMNav   = () => { mobileNav.style.display='block'; mobileNav.setAttribute('aria-hidden','false'); };
+menuToggle.addEventListener('click', e => { e.stopPropagation(); mobileNav.style.display==='block' ? closeMNav() : openMNav(); });
+document.addEventListener('click',   e => { if (!mobileNav.contains(e.target) && e.target!==menuToggle) closeMNav(); });
+</script>
+</body>
+</html>

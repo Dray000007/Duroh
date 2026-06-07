@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Inbox – DUROH</title>
+  <link rel="stylesheet" href="chat.css">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+</head>
+<body>
+  <header class="navbar">
+    <div class="logo">DUROH</div>
+    <nav>
+      <ul class="nav-items">
+        <li class="nav-item"><button class="nav-link" id="homeBtn"><span class="material-symbols-outlined">home</span> Home</button></li>
+        <li class="nav-item"><button class="nav-link active"><span class="material-symbols-outlined">inbox</span> Inbox</button></li>
+        <li class="nav-item"><button class="nav-link" id="uploadBtn"><span class="material-symbols-outlined">upload</span> Upload</button></li>
+        <li class="nav-item"><button class="nav-link" id="profileBtn"><span class="material-symbols-outlined">person</span> Profile</button></li>
+      </ul>
+    </nav>
+    <button class="menu-toggle" id="menuToggle"><span class="material-symbols-outlined">menu</span></button>
+    <nav class="mobile-nav" id="mobileNav" aria-hidden="true">
+      <ul>
+        <li><button class="nav-link" onclick="window.location.href='index.html'">Home</button></li>
+        <li><button class="nav-link" onclick="window.location.href='chat.html'">Chat</button></li>
+        <li><button class="nav-link" onclick="window.location.href='upload.html'">Upload</button></li>
+        <li><button class="nav-link" onclick="window.location.href='profile.html'">Profile</button></li>
+      </ul>
+    </nav>
+  </header>
+  <div class="chat-container">
+    <div class="messages" id="messages"></div>
+    <div class="chat-input-container">
+      <input type="text" id="chatInput" placeholder="Type your message…" />
+      <button id="sendBtn"><span class="material-symbols-outlined">send</span></button>
+    </div>
+  </div>
+  <script type="module">
+    import { client, account, databases, requireAuth, Query, ID, DB_ID, COL_MESSAGES } from './appwrite.js';
+    document.getElementById('homeBtn').onclick    = () => window.location.href='index.html';
+    document.getElementById('uploadBtn').onclick  = () => window.location.href='upload.html';
+    document.getElementById('profileBtn').onclick = () => window.location.href='profile.html';
+    const menuToggle=document.getElementById('menuToggle');
+    const mobileNav=document.getElementById('mobileNav');
+    const closeNav=()=>{mobileNav.style.display='none';mobileNav.setAttribute('aria-hidden','true')};
+    const openNav=()=>{mobileNav.style.display='block';mobileNav.setAttribute('aria-hidden','false')};
+    menuToggle.addEventListener('click',e=>{e.stopPropagation();mobileNav.style.display==='block'?closeNav():openNav()});
+    document.addEventListener('click',e=>{if(!mobileNav.contains(e.target)&&e.target!==menuToggle)closeNav()});
+
+    const currentUser = await requireAuth('index.html');
+    if (!currentUser) throw new Error('Not authenticated');
+    const prefs = await account.getPrefs().catch(()=>({}));
+    const displayName = prefs.firstName || currentUser.name?.split(' ')[0] || 'User';
+    const picUrl = prefs.picUrl || null;
+
+    const messagesEl=document.getElementById('messages');
+    const chatInput=document.getElementById('chatInput');
+    const sendBtn=document.getElementById('sendBtn');
+
+    function appendMessage(msg){
+      const isSent=msg.user_id===currentUser.$id;
+      const div=document.createElement('div');
+      div.className='message '+(isSent?'sent':'received');
+      const senderDiv=document.createElement('div');senderDiv.className='sender-info';
+      const pic=document.createElement('img');pic.className='sender-pic';pic.src=msg.picUrl||'dre.jpg';pic.alt=msg.first_name||'User';
+      const name=document.createElement('span');name.textContent=msg.first_name||'User';
+      senderDiv.appendChild(pic);senderDiv.appendChild(name);
+      const content=document.createElement('div');content.className='content';content.textContent=msg.content;
+      const time=document.createElement('div');time.className='time';time.textContent=new Date(msg.created_at||msg.$createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      div.appendChild(senderDiv);div.appendChild(content);div.appendChild(time);
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop=messagesEl.scrollHeight;
+    }
+
+    async function loadMessages(){
+      try{
+        const res=await databases.listDocuments(DB_ID,COL_MESSAGES,[Query.orderAsc('created_at'),Query.limit(200)]);
+        messagesEl.innerHTML='';
+        res.documents.forEach(appendMessage);
+      }catch(err){console.error(err);}
+    }
+
+    async function sendMessage(){
+      const content=chatInput.value.trim();
+      if(!content)return;
+      chatInput.value='';
+      const msg={user_id:currentUser.$id,first_name:displayName,picUrl,content,created_at:new Date().toISOString()};
+      appendMessage(msg);
+      try{await databases.createDocument(DB_ID,COL_MESSAGES,ID.unique(),msg);}
+      catch(err){console.error(err);}
+    }
+
+    sendBtn.addEventListener('click',sendMessage);
+    chatInput.addEventListener('keydown',e=>{if(e.key==='Enter')sendMessage();});
+
+    // Appwrite Realtime
+    client.subscribe(`databases.${DB_ID}.collections.${COL_MESSAGES}.documents`, response=>{
+      if(response.events.some(ev=>ev.includes('.create'))){
+        const doc=response.payload;
+        if(doc.user_id!==currentUser.$id) appendMessage(doc);
+      }
+    });
+
+    loadMessages();
+  </script>
+</body>
+</html>
